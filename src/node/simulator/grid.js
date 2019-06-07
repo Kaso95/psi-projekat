@@ -110,7 +110,7 @@ class Grid extends O.EventEmitter{
     while(1){
       const d = this.getv(ray.move());
 
-      if((findAny ? d.nempty : findOpaque && d.has.opaque)){
+      if(findAny ? d.nempty : findOpaque && d.has.opaque){
         ray.nav(ray.dir);
         return d;
       }

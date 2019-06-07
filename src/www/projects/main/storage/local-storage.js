@@ -2,10 +2,13 @@
 
 const EnhancedStorage = require('./enhanced-storage');
 
+const DEFAULT_LANGUAGE = 'sr-cyrl-rs';
+
 const keys = [
   'token',
   'nick',
   'isMod',
+  'lang',
 ];
 
 class LocalStorage extends EnhancedStorage{
@@ -19,6 +22,7 @@ class LocalStorage extends EnhancedStorage{
     state.token = null;
     state.nick = null;
     state.isMod = null;
+    state.lang = DEFAULT_LANGUAGE;
 
     return this;
   }
@@ -35,6 +39,8 @@ class LocalStorage extends EnhancedStorage{
       ser.write(0);
     }
 
+    ser.writeStr(state.lang);
+
     return ser;
   }
 
@@ -46,6 +52,8 @@ class LocalStorage extends EnhancedStorage{
       state.nick = ser.readStr();
       state.isMod = ser.read();
     }
+
+    state.lang = ser.readStr();
 
     return this;
   }

@@ -10,15 +10,16 @@ class Language extends Page{
     super(parent);
 
     const form = new Form(this);
-    const field = form.createField(Element.InputDropdown);
+    const field = form.createField(Element.InputDropdown, 'lang');
 
     for(const lang of O.sortAsc(O.keys(LS.langs)))
       field.addOpt(lang, LS.langs[lang], lang === LS.lang);
 
     form.addConfirm();
 
-    form.on('confirm', () => {
-      O.glob.dom.noimpl();
+    form.on('confirm', fields => {
+      O.lst.lang = fields.lang;
+      O.glob.dom.reload(1);
     });
 
     this.form = form;

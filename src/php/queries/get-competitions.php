@@ -3,7 +3,7 @@
     public function query($pdo, $args){
       if($args->token === null){
         $st = $pdo->prepare('
-          select idComp as id, title, description as `desc`, startDate as date, 0 as applied
+          select idComp as id, title, description as `desc`, startDate as date, maxUsers, currentUsers, 0 as applied
           from Competition
           where instr(description, ?) > 0
           order by startDate desc

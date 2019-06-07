@@ -2,7 +2,7 @@
 
 // Local strings
 
-const LANGUAGE = 'sr-cyrl-rs';
+const LANGUAGE = O.lst.lang;
 const dir = `./locales/${LANGUAGE}`;
 
 const LS = require(`${dir}/main`);

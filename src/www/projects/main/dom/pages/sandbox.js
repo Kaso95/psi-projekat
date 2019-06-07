@@ -19,7 +19,7 @@ const SCRIPT_VERSION = 1;
 const WIDTH = 926;
 const HEIGHT = 671;
 
-const DEFAULT_TAB = 'simulator';
+const DEFAULT_TAB = 'script';
 
 class Sandbox extends Page{
   constructor(parent){

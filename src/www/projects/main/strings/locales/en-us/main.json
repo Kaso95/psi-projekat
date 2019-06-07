@@ -1,5 +1,4 @@
 {
-
   "labels": {
     "navbar": {
       "left": {
@@ -32,6 +31,8 @@
         "postContent": "Post content",
         "compTitle": "Competition title",
         "compDesc": "Competition description",
+        "compStartDate": "Start date",
+        "compMaxUsers": "Maximal number of users",
         "newVal": "New value"
       },
       "buttons": {
@@ -50,10 +51,18 @@
       "input": "Input",
       "output": "Output",
       "simulator": "Simulator",
-      "config": "Settings"
+      "settings": "Settings",
+      "options": {
+        "progLang": "Programming language",
+        "maxSize": "Maximal memory size",
+        "criticalSize": "Critical memory size",
+        "instructionsPerTick": "Instructions per tick"
+      },
+      "buttons": {
+        "exportScript": "Export script"
+      }
     },
     "competition": {
-      "title": "Competition title",
       "startTime": "Start time",
       "apply": "Apply",
       "giveUp": "Give up",
@@ -82,11 +91,15 @@
     "home": "Home",
     "sandbox": "Sandbox",
     "competition": "Competition",
+    "search": "Search",
     "help": "Help",
     "language": "Language",
     "register": "Register",
     "login": "Login",
     "userProfile": "User profile"
+  },
+  "messages": {
+    "loadingFile": "Loading file..."
   },
   "simulator": {
     "objects": {
@@ -101,7 +114,13 @@
   "errors": {
     "error": "Error",
     "noimpl": "The requested functionality is not implemented",
-    "singleFile": "You can select one file at most",
+    "multipleFiles": "You can select one file at most",
+    "cannotLoadFile": "Unable to load file",
+    "invalidNum": "Invalid number",
+    "tooSmallNum": "The number is too small",
+    "tooBigNum": "The number is too large",
+    "invalidDateFormat": "Date must be in format \"dd.mm.yyyy. hh:mm\"",
+    "multipleBotsInSandbox": "Only one bot is allowed in sandbox",
     "server": {
       "status": {
         "400": "Illegal request",
@@ -122,9 +141,13 @@
       "nickExists": "The username you entered already exists",
       "wrongNickOrPass": "Invalid username or password",
       "notEnoughPoints": "You do not have enough points",
+      "compFull": "The competition is full",
+      "compStartedApply": "You cannot apply for this competitions, because it has already started, or has finished",
+      "compStartedGiveUp": "You cannot sign out from this competitions, because it has already started, or has finished",
       "alreadyMod": "User is already moderator",
       "invalidToken": "Invalid token",
       "invalidImg": "Unknown image format",
+      "invalidScript": "Invalid script format. You must upload the script that you exported from sandbox",
       "forbidden": "You do not have enough permission to perform the requested action",
       "data": "Invalid request",
       "php": "Error on PHP server"

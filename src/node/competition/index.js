@@ -18,7 +18,7 @@ const fast = !HD;
 
 const [wh, hh] = [w, h].map(a => a >> 1);
 
-const duration = 60;
+const duration = 300;
 const framesNum = fps * duration;
 
 const outputFile = 'C:/wamp/www/projects/video/1.mp4';

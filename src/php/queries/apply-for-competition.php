@@ -17,7 +17,7 @@
       $user = $row['id'];
 
       if($row === false || $row['comps'] !== 1 || $row['pars'] !== 0){
-        $this->err('data');
+        $this->err('data_1');
         return;
       }
 
@@ -30,12 +30,12 @@
       $row = $st->fetch();
 
       if($this->date >= $row['startDate']){
-        $this->err('compStartedApply');
+        $this->err('compStartedApply_2');
         return;
       }
 
       if($row['currentUsers'] === $row['maxUsers']){
-        $this->err('compFull');
+        $this->err('compFull_3');
         return;
       }
 

@@ -108,7 +108,7 @@ class HTTPServer extends Server{
         if(match === null) e404();
 
         const nick = match[1];
-        if(!/^[a-z\-]+$/.test(nick)) e404();
+        if(!/^[a-z0-9\-]+$/.test(nick)) e404();
 
         const dir = config.dirs.avatars;
         let file = path.join(dir, `${nick}.png`);
@@ -146,6 +146,12 @@ class HTTPServer extends Server{
         err(500, 'unknownEntry');
       }
     }catch(e){
+      if(!errHandled){
+        log('[WARNING] Internal server error');
+        log(e);
+        log();
+      }
+
       err(500, String(e));
     }
   }
