@@ -6,12 +6,13 @@
 
 Следеће програме је неопходно инсталирати:
 
-* [Node.js](https://nodejs.org/en/) верзија `v12.0.0` (мора тачно ова верзија)
-* [Electron](https://electronjs.org/) верзија `v6.0.0-nightly.20190311` (мора тачно ова верзија)
+* [Node.js](https://nodejs.org/en/) верзија `v12.0.0` или новија
+* [NPM](https://www.npmjs.com/) верзија `v6.9.0` или новија (инсталира се аутоматски при инсталацији Node.js)
+* [Electron](https://electronjs.org/) верзија `v6.0.0-nightly.20190311` или новија (инсталира се командом `npm i -D -g electron-nightly`)
 * [Chrome](https://www.google.co.uk/chrome/) верзија `74.0.3729.108` или новија
-* [PHP](https://www.php.net/downloads.php) верзија `7.2.4` (можда може и нека друга, али није тестирано)
-* [MySQL](https://www.mysql.com/downloads/) верзија `5.7.21` (можда може и нека друга, али није тестирано)
-* [FFmpeg](https://ffmpeg.org/) верзија `4.1` (можда може и нека друга, али није тестирано)
+* [PHP](https://www.php.net/downloads.php) верзија `7.2.4`
+* [MySQL](https://www.mysql.com/downloads/) верзија `5.7.21`
+* [FFmpeg](https://ffmpeg.org/) верзија `4.1`
 
 ## Остали неопходни кораци
 
