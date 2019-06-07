@@ -116,23 +116,23 @@ const methods = {
   },
 
   async applyForCompetition(token, idComp, scriptData){
-    if(!check.token(token)) throw 'data1';
-    if(!check.id(idComp)) throw 'data2';
-    if(!check.str(scriptData)) throw 'data3';
+    if(!check.token(token)) throw 'data';
+    if(!check.id(idComp)) throw 'data';
+    if(!check.str(scriptData)) throw 'data';
 
     const msg = 'invalidScript';
     const buf = Buffer.from(scriptData, 'base64');
     let s = null;
 
     try{ s = new O.Serializer(buf, 1); }catch{}
-    if(s === null) throw msg+"1";
+    if(s === null) throw msg;
 
     const ser = s;
-    if(ser.readStr() !== SCRIPT_IDENTIFIER) throw msg+"2";
-    if(ser.readUint() !== SCRIPT_VERSION) throw msg+"3";
+    if(ser.readStr() !== SCRIPT_IDENTIFIER) throw msg;
+    if(ser.readUint() !== SCRIPT_VERSION) throw msg;
 
     const lang = ser.readStr();
-    if(!O.has(langsList, lang)) throw msg+"4";
+    if(!O.has(langsList, lang)) throw msg;
 
     const script = ser.readStr();
     await php.exec('applyForCompetition', {token, idComp, lang, script});
