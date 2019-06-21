@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const O = require('../../omikron');
+const config = require('../../config');
+const echo = require('../../echo');
 const Server = require('../server');
 const Captcha = require('../data/captcha');
 
@@ -14,6 +16,7 @@ const INDEX_FILE = 'index.htm';
 
 const cwd = __dirname;
 const wwwDir = path.join(cwd, '../../../www');
+const nodeDir = path.join(cwd, '../..');
 
 class HTTPServer extends Server{
   constructor(port){
@@ -78,6 +81,17 @@ class HTTPServer extends Server{
       if(/^(?:omikron|framework)\.js$/.test(pth))
         return send(O.dirs.omikron);
 
+      if(pth === 'echo'){
+        const match = url.match(/[\?\&]token=([^\&]*)/);
+        if(match === null) e404();
+
+        const token = match[1];
+        const buf = echo.get(token);
+        if(buf === null) e404();
+
+        return res.end(buf);
+      }
+
       if(pth === 'captcha'){
         const match = url.match(/[\?\&]token=([^\&]*)/);
         if(match === null) e404();
@@ -87,6 +101,20 @@ class HTTPServer extends Server{
         if(captcha === null) e404();
 
         return send(captcha.file);
+      }
+
+      if(pth === 'avatar'){
+        const match = url.match(/[\?\&]nick=([^\&]*)/);
+        if(match === null) e404();
+
+        const nick = match[1];
+        if(!/^[a-z0-9\-]+$/.test(nick)) e404();
+
+        const dir = config.dirs.avatars;
+        let file = path.join(dir, `${nick}.png`);
+        if(!fs.existsSync(file)) file = path.join(dir, `${config.defaultAvatar}.png`);
+
+        return send(file);
       }
 
       if(
@@ -99,7 +127,11 @@ class HTTPServer extends Server{
           e404();
       };
 
-      let entry = path.join(wwwDir, pth);
+      const isNode = pth.startsWith('node/');
+      const dir = isNode ? nodeDir : wwwDir;
+      const pthNew = isNode ? pth.split('/').slice(1).join('/') : pth;
+
+      let entry = path.join(dir, pthNew);
       check(entry);
 
       const stat = fs.statSync(entry);
@@ -114,9 +146,15 @@ class HTTPServer extends Server{
         err(500, 'unknownEntry');
       }
     }catch(e){
+      if(!errHandled){
+        log('[WARNING] Internal server error');
+        log(e);
+        log();
+      }
+
       err(500, String(e));
     }
   }
-};
+}
 
 module.exports = HTTPServer;

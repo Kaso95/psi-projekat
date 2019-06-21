@@ -222,16 +222,40 @@ class Color extends Uint8ClampedArray{
 };
 
 class EventEmitter{
-  constructor(){
-    this.ls = O.obj();
+  #ls = O.obj();
+
+  on(type, func){
+    const ls = this.#ls;
+    if(!(type in ls)) ls[type] = new Map();
+    ls[type].set(func, 1);
+    return this;
+  }
+
+  addEventListener(type, func){
+    return this.on(type, func);
+  }
+
+  ael(type, func){
+    return this.on(type, func);
+  }
+
+  once(type, func){
+    const ls = this.#ls;
+    if(!(type in ls)) ls[type] = new Map();
+    ls[type].set(func, 0);
+    return this;
   }
 
   removeListener(type, func){
-    const {ls} = this;
+    const ls = this.#ls;
     if(!(type in ls)) return;
     ls[type].delete(func);
     if(ls[type].size === 0) delete ls[type];
     return this;
+  }
+
+  rel(type, func){
+    return this.removeListener(type, func);
   }
 
   removeAllListeners(type){
@@ -239,30 +263,18 @@ class EventEmitter{
     return this;
   }
 
-  on(type, func){
-    const {ls} = this;
-    if(!(type in ls)) ls[type] = new Map();
-    ls[type].set(func, 1);
-    return this;
-  }
-
-  once(type, func){
-    const {ls} = this;
-    if(!(type in ls)) ls[type] = new Map();
-    ls[type].set(func, 0);
-    return this;
-  }
-
   emit(type, ...args){
-    const {ls} = this;
+    const ls = this.#ls;
     if(!(type in ls)) return this;
 
+    let val = null;
+
     for(const [func, repeat] of ls[type]){
-      func(...args);
+      val = func(...args);
       if(!repeat) this.removeListener(type, func);
     }
 
-    return this;
+    return val;
   }
 };
 
@@ -550,22 +562,22 @@ class Grid{
   }
 };
 
-class GridUI{
-  constructor(w, h, s, func=() => O.obj()){
+class GridUI extends EventEmitter{
+  constructor(g, w, h, s, func=() => O.obj()){
+    super();
+
+    this.canvas = g.canvas;
     this.func = func;
     this.grid = new O.Grid(w, h, func);
     this.scale = s;
 
-    const {g, w: iw, h: ih} = O.ceCanvas(1);
-    const [iwh, ihh] = [iw, ih].map(a => a / 2);
-
     g.concaveMode = 1;
 
     this.g = g;
-    this.iw = iw;
-    this.ih = ih;
-    this.iwh = iwh;
-    this.ihh = ihh;
+    this.iw = g.w;
+    this.ih = g.h;
+    this.iwh = g.w / 2;
+    this.ihh = g.h / 2;
 
     this.transform();
 
@@ -580,7 +592,6 @@ class GridUI{
 
     this.wrap = 0;
 
-    this.ls = O.obj();
     this.aels();
   }
 
@@ -663,17 +674,30 @@ class GridUI{
     });
 
     O.ael('contextmenu', evt => {
-      evt.preventDefault();
-      evt.stopPropagation();
+      O.pd(evt);
     });
   }
 
+  on(type, func){
+    if(type === 'draw'){
+      this.funcs.draw.push(func);
+      return;
+    }
+
+    if(type === 'frame'){
+      this.funcs.frame.push(func);
+      return;
+    }
+
+    super.on(type, func);
+  }
+
   updateCur(evt){
-    const {clientX: x, clientY: y} = evt;
     const {scale, g, cur} = this;
 
-    cur.x = Math.floor((x - g.tx) / scale);
-    cur.y = Math.floor((y - g.ty) / scale);
+    const rect = this.canvas.getBoundingClientRect();
+    cur.x = Math.floor((evt.clientX - g.tx - rect.x) / scale);
+    cur.y = Math.floor((evt.clientY - g.ty - rect.y) / scale);
   }
 
   transform(){
@@ -745,40 +769,6 @@ class GridUI{
     this.draw();
 
     O.raf(this.render.bind(this));
-  }
-
-  removeListener(type, func){
-    const {ls} = this;
-    if(!(type in ls)) return;
-    ls[type].remove(func);
-  }
-
-  removeAllListeners(type){
-    delete this.ls[type];
-  }
-
-  on(type, func){
-    if(type === 'draw'){
-      this.funcs.draw.push(func);
-      return;
-    }
-
-    if(type === 'frame'){
-      this.funcs.frame.push(func);
-      return;
-    }
-
-    const {ls} = this;
-    if(!(type in ls)) ls[type] = new Set();
-    ls[type].add(func);
-    return this;
-  }
-
-  emit(type, ...args){
-    const {ls} = this;
-    if(!(type in ls)) return;
-    for(const func of ls[type])
-      func(...args);
   }
 };
 
@@ -914,7 +904,7 @@ class Map2D{
 };
 
 class Map3D{
-  constructor(x=null, y=null, z = null, val=1){
+  constructor(x=null, y=null, z=null, val=1){
     this.d = O.obj();
 
     if(x !== null)
@@ -1223,8 +1213,8 @@ class EnhancedRenderingContext{
 
     this.fillStyle = 'white';
     this.strokeStyle = 'black';
-    this.textAlign = 'center';
     this.textBaseline = 'middle';
+    this.textAlign = 'center';
 
     this.drawImage = g.drawImage.bind(g);
 
@@ -1657,7 +1647,7 @@ class Buffer extends Uint8Array{
     return new O.Buffer(size);
   }
 
-  static from(data, encoding='utf8'){
+  static from(data, encoding='utf8', mode=0){
     if(data.length === 0)
       return O.Buffer.alloc(0);
 
@@ -1668,7 +1658,7 @@ class Buffer extends Uint8Array{
         break;
 
       case 'base64':
-        return O.base64.decode(data);
+        return O.base64.decode(data, mode);
         break;
 
       case 'utf8':
@@ -1724,14 +1714,14 @@ class Buffer extends Uint8Array{
     this[offset + 3] = val;
   }
 
-  toString(encoding){
+  toString(encoding='utf8', mode=0){
     switch(encoding){
       case 'hex':
         return Array.from(this).map(a => a.toString(16).padStart(2, '0')).join('');
         break;
 
       case 'base64':
-        return O.base64.encode(this);
+        return O.base64.encode(this, mode);
         break;
 
       case 'utf8':
@@ -1794,6 +1784,23 @@ class IO{
     return buf;
   }
 
+  static async unlocka(buf, sameBuf=0){
+    if(!sameBuf) buf = O.Buffer.from(buf);
+    const err = () => { throw new TypeError('Invalid checksum'); };
+
+    const len = buf.length;
+    if(len < 32) err();
+
+    const cs = O.Buffer.from(buf.slice(len - 32));
+
+    buf = O.Buffer.from(buf.slice(0, len - 32));
+    await IO.xora(buf, cs, 1);
+
+    if(!O.sha256(buf).equals(cs)) err();
+
+    return buf;
+  }
+
   static xor(buf, hash, sameBuf=0){
     if(!sameBuf) buf = O.Buffer.from(buf);
     const len = buf.length;
@@ -1803,7 +1810,29 @@ class IO{
 
       if(j === 32){
         hash = O.sha256(hash);
-        j = 0;
+        j = -1;
+      }
+    }
+
+    return buf;
+  }
+
+  static async xora(buf, hash, sameBuf=0){
+    if(!sameBuf) buf = O.Buffer.from(buf);
+    const len = buf.length;
+    let cnt = 0;
+
+    for(let i = 0, j = 0; i !== len; i++, j++){
+      buf[i] ^= hash[j];
+
+      if(j === 32){
+        hash = O.sha256(hash);
+        j = -1;
+      }
+
+      if(++cnt === 1e5){
+        await O.waita(16);
+        cnt = 0;
       }
     }
 
@@ -1826,7 +1855,7 @@ class IO{
     if((this.outputIndex & 7) === 0) this.addByte();
   }
 
-  hasMore(){
+  get hasMore(){
     return (this.inputIndex >> 4) < this.input.length;
   }
 
@@ -1855,6 +1884,9 @@ class IO{
 };
 
 class Serializer extends IO{
+  static #abuf = new ArrayBuffer(8);
+  static #view = new DataView(this.#abuf);
+
   constructor(buf, checksum=0){
     super(buf, checksum);
   }
@@ -1900,8 +1932,9 @@ class Serializer extends IO{
     return num;
   }
 
-  writeInt(num){
-    num = (num | 0) + 1;
+  writeInt(num, signed=1){
+    const snum = num;
+    num = -~Math.abs(num);
 
     while(num !== 1){
       super.write(1);
@@ -1909,27 +1942,72 @@ class Serializer extends IO{
       num >>= 1;
     }
 
-    return super.write(0);
+    super.write(0);
+
+    if(signed && snum !== 0)
+      super.write(snum < 0);
+
+    return this;
   }
 
-  readInt(){
+  readInt(signed=1){
     let num = 0;
     let mask = 1;
     let len = 0;
 
     while(super.read()){
-      if(++len === 30)
-        throw new RangeError('Too large integer');
-      if(super.read())
-        num |= mask;
+      if(super.read()) num |= mask;
       mask <<= 1;
     }
 
-    return (num | mask) - 1;
+    num = ~-(num | mask);
+
+    if(signed && num !== 0 && super.read())
+      num = -num;
+
+    return num;
+  }
+
+  writeUint(num){
+    return this.writeInt(num, 0);
+  }
+
+  readUint(){
+    return this.readInt(0);
+  }
+
+  writeFloat(f){
+    const view = this.constructor.#view;
+    view.setFloat32(0, f, 1);
+    for(let i = 0; i !== 4; i++)
+      this.write(view.getUint8(i), 255);
+    return this;
+  }
+
+  readFloat(){
+    const view = this.constructor.#view;
+    for(let i = 0; i !== 4; i++)
+      view.setUint8(i, this.read(255));
+    return view.getFloat32(0, 1);
+  }
+
+  writeDouble(f){
+    const view = this.constructor.#view;
+    view.setFloat64(0, f, 1);
+    for(let i = 0; i !== 8; i++)
+      this.write(view.getUint8(i), 255);
+    return this;
+  }
+
+  readDouble(){
+    const view = this.constructor.#view;
+    for(let i = 0; i !== 8; i++)
+      view.setUint8(i, this.read(255));
+    return view.getFloat64(0, 1);
   }
 
   writeBuf(buf){
-    this.writeInt(buf.length);
+    this.writeUint(buf.length);
 
     for(const byte of buf)
       this.write(byte, 255);
@@ -1938,7 +2016,7 @@ class Serializer extends IO{
   }
 
   readBuf(){
-    const len = this.readInt();
+    const len = this.readUint();
     const buf = O.Buffer.alloc(len);
 
     for(let i = 0; i !== len; i++)
@@ -1974,176 +2052,9 @@ class Serializer extends IO{
 class Serializable{
   ser(ser=new O.Serializer()){ O.virtual('ser'); }
   deser(ser){ O.virtual('deser'); }
-  static deser(ser){ O.virtual('deser'); } // Optional
 
-  reser(){
-    return this.deser(new O.Serializer(this.ser().getOutput()));
-  }
-};
-
-class Graph extends Serializable{
-  constructor(nodeCtors, maxSize=null){
-    super();
-
-    this.nodeCtors = nodeCtors;
-    this.maxSize = maxSize;
-    this.nodes = new Set();
-    this.ctorsNum = nodeCtors.length;
-
-    {
-      const ctorsMap = new Map();
-      const ctorsKeys = new Map();
-
-      nodeCtors.forEach((ctor, index) => {
-        ctorsMap.set(ctor, index);
-        ctorsKeys.set(ctor, ctor.keys());
-      });
-
-      this.ctorsMap = ctorsMap;
-      this.ctorsKeys = ctorsKeys;
-    }
-  }
-
-  addNode(node){
-    const {maxSize} = this;
-
-    if(maxSize !== null && this.size === maxSize){
-      this.cleanup();
-      if(this.size === maxSize)
-        throw new RangeError('Maximum graph size exceeded');
-    }
-
-    this.nodes.add(node);
-  }
-
-  ser(ser=new O.Serializer()){
-    const {nodes, ctorsNum, ctorsMap, ctorsKeys} = this;
-    const lastCtorIndex = ctorsNum - 1;
-
-    const all = new Set(nodes);
-    const done = new Map();
-    const queue = [];
-
-    const lastNodeIndex = all.size - 1;
-    ser.writeInt(all.size);
-
-    while(all.size !== 0){
-      let first = 1;
-
-      queue.push(O.first(all));
-
-      while(queue.length !== 0){
-        const node = queue.shift();
-
-        if(node === null){
-          ser.write(0);
-          continue;
-        }else if(!first){
-          ser.write(1);
-        }
-
-        const ctor = node.constructor;
-        const seen = done.has(node);
-        const index = seen ? done.get(node) : done.size;
-
-        if(first) first = 0;
-        else ser.write(index, Math.min(done.size, lastNodeIndex));
-        if(seen) continue;
-
-        all.delete(node);
-        done.set(node, index);
-
-        ser.write(ctorsMap.get(ctor), lastCtorIndex);
-        node.ser(ser);
-
-        for(const key of ctorsKeys.get(ctor))
-          queue.push(node[key]);
-      }
-    }
-
-    return ser;
-  }
-
-  deser(ser){
-    const {nodeCtors, ctorsNum, ctorsKeys} = this;
-    const lastCtorIndex = ctorsNum - 1;
-
-    const nodes = new Set();
-    this.nodes = nodes;
-
-    const nodesNum = ser.readInt();
-    const lastNodeIndex = nodesNum - 1;
-
-    const done = [];
-    const queue = [];
-
-    while(nodes.size !== nodesNum){
-      let first = 1;
-
-      while(queue.length !== 0 || first){
-        const isNull = first ? 0 : !ser.read();
-        const index = first ? nodes.size : isNull ? -1 : ser.read(Math.min(nodes.size, lastNodeIndex));
-        const seen = isNull || index !== nodes.size;
-        const node = seen ? isNull ? null : done[index] : new nodeCtors[ser.read(lastCtorIndex)](this);
-
-        if(first){
-          first = 0;
-        }else{
-          const elem = queue[0];
-          const keys = ctorsKeys.get(elem[0].constructor);
-          elem[0][keys[elem[1]++]] = node;
-          if(elem[1] === keys.length) queue.shift();
-        }
-
-        if(seen) continue;
-
-        done.push(node);
-        node.deser(ser);
-
-        if(ctorsKeys.get(node.constructor).length !== 0)
-          queue.push([node, 0]);
-      }
-    }
-
-    return this;
-  }
-
-  cleanup(){
-    const {ctorsKeys} = this;
-    if(this.size === 0) return this;
-
-    const nodes = new Set();
-    const queue = [O.first(this.nodes)];
-
-    while(queue.length !== 0){
-      const node = queue.shift();
-
-      nodes.add(node);
-
-      for(const key of ctorsKeys.get(node.constructor)){
-        const next = node[key];
-        if(next === null || nodes.has(next)) continue;
-        queue.push(next);
-      }
-    }
-
-    this.nodes = nodes;
-
-    return this;
-  }
-
-  get size(){ return this.nodes.size; }
-};
-
-class GraphNode extends Serializable{
-  constructor(graph){
-    super();
-
-    this.graph = graph;
-    graph.addNode(this);
-  }
-
-  static keys(){ O.virtual('keys'); }
+  static deser(ser){ return new this().deser(ser); }
+  reser(){ return this.deser(new O.Serializer(this.ser().getOutput())); }
 };
 
 class Storage extends Serializable{
@@ -2267,7 +2178,9 @@ const O = {
   pi: Math.PI,
   pi2: Math.PI * 2,
   pih: Math.PI / 2,
+  pi3: Math.PI * 3,
   pi32: Math.PI * 3 / 2,
+  pi34: Math.PI * 3 / 4,
 
   static: Symbol('static'),
   project: null,
@@ -2275,6 +2188,10 @@ const O = {
   enhancedRNG: 0,
   fastSha256: 1,
   rseed: null,
+
+  // Log
+
+  log: null,
 
   // Node modules
 
@@ -2293,6 +2210,11 @@ const O = {
   // Global data
 
   glob: null,
+
+  // Time simulation
+
+  time: 0,
+  animFrameCbs: [],
 
   // Symbols
 
@@ -2316,8 +2238,6 @@ const O = {
   IO,
   Serializer,
   Serializable,
-  Graph,
-  GraphNode,
   Storage,
   Semaphore,
 
@@ -2326,20 +2246,21 @@ const O = {
 
     O.glob = O.obj();
 
-    var global = O.global = new Function('return this;')();
-    var env = 'navigator' in global ? 'browser' : 'node';
+    const global = O.global = new Function('return this;')();
+    const env = 'navigator' in global ? 'browser' : 'node';
 
     O.env = env;
 
-    var isBrowser = O.isBrowser = env === 'browser';
-    var isNode = O.isNode = env === 'node';
-    var isElectron = O.isElectron = isBrowser && navigator.userAgent.includes('Electron');
+    const isBrowser = O.isBrowser = env === 'browser';
+    const isNode = O.isNode = env === 'node';
+    const isElectron = O.isElectron = isBrowser && navigator.userAgent.includes('Electron');
 
     if(isBrowser){
       if(CHROME_ONLY && global.navigator.vendor !== 'Google Inc.')
         return O.error('Please use Chrome.');
 
       if(!isElectron){
+        global.global = global;
         O.lst = window.localStorage;
         O.sst = window.sessionStorage;
       }
@@ -2354,6 +2275,7 @@ const O = {
       O.overrideConsole();
 
     O.module.cache = O.obj();
+    O.modulesPolyfill = O.modulesPolyfill();
 
     /*
       Older versions of Google Chrome had issues with Math.random()
@@ -2362,26 +2284,40 @@ const O = {
       random number generator that depends on current time in
       milliseconds and internal 256-bit state.
     */
-    O.enhanceRNG(O.symbols.enhanceRNG);
+    // O.enhanceRNG(O.symbols.enhanceRNG);
 
     if(loadProject){
-      O.project = 'main';
+      const mainProject = 'main';
+      const project = O.project = O.urlParam('project');
+
+      const loadProj = project => {
+        O.project = project;
+
+        if(!O.projectTest(O.project))
+          return O.error(`Illegal project name ${JSON.stringify(O.ascii(O.project))}".`);
+
+        // TODO: fix this
+        O.req(`/projects/${O.project}/main`)//.catch(O.error);
+      };
 
       if(O.project == null){
         O.rf(`projects.txt`, (status, projects) => {
           if(status != 200) return O.error(`Failed to load projects list.`);
 
+          projects = O.sortAsc(O.sanl(projects));
+
+          if(projects.includes(mainProject))
+            return loadProj(mainProject);
+
           O.title('Projects');
-          O.sortAsc(O.sanl(projects)).forEach((project, index, projects) => {
+
+          projects.forEach((project, index, projects) => {
             O.ceLink(O.body, O.projectToName(project), `/?project=${project}`);
             if(index < projects.length - 1) O.ceBr(O.body);
           });
         });
       }else{
-        if(!O.projectTest(O.project))
-        return O.error(`Illegal project name ${JSON.stringify(O.ascii(O.project))}".`);
-
-        O.req(`/projects/${O.project}/main`).catch(O.error);
+        loadProj(O.project);
       }
     }
   },
@@ -2410,20 +2346,21 @@ const O = {
   overrideConsole(){
     const {global, isNode, isElectron} = O;
 
-    var console = global.console;
-    var logOrig = console.log;
+    const console = global.console;
+    const logOrig = console.log;
 
-    var indent = 0;
+    let indent = 0;
 
-    var logFunc = (...args) => {
+    const logFunc = (...args) => {
       if(args.length === 0){
         logOrig('');
         return;
       }
 
+      const indentStr = ' '.repeat(indent << 1);
+
       if(isNode || isElectron){
-        var indentStr = ' '.repeat(indent << 1);
-        var str = O.inspect(args);
+        let str = O.inspect(args);
 
         str = O.sanl(str).map(line => {
           return `${indentStr}${line}`;
@@ -2431,19 +2368,23 @@ const O = {
 
         logOrig(str);
       }else{
-        logOrig(...args);
+        const as = indent !== 0 ? [indentStr, ...args] : args;
+        logOrig(...as);
       }
 
-      return args[args.length - 1];
+      return O.last(args);
     };
 
-    logFunc.inc = (val=1) => {
-      indent += val;
+    logFunc.inc = (...args) => {
+      if(args.length !== 0) logFunc.apply(null, args);
+      indent++;
+      return O.last(args);
     };
 
-    logFunc.dec = (val=1) => {
-      indent -= val;
-      if(indent < 0) indent = 0;
+    logFunc.dec = (...args) => {
+      if(args.length !== 0) logFunc.apply(null, args);
+      if(indent !== 0) indent--;
+      return O.last(args);
     };
 
     logFunc.get = () => {
@@ -2454,6 +2395,7 @@ const O = {
       indent = i;
     };
 
+    O.log = logFunc;
     global.log = logFunc;
     global.isConsoleOverriden = 1;
   },
@@ -2478,7 +2420,8 @@ const O = {
   },
 
   error(err){
-    log(new Error().stack);
+    if(err instanceof Error) err = err.message;
+    console.error(err);
 
     O.body.classList.remove('has-canvas');
     O.body.style.margin = '8px';
@@ -2659,7 +2602,7 @@ const O = {
 
   urlTime(url){
     var char = url.indexOf('?') !== -1 ? '&' : '?';
-    return `${url}${char}_=${O.now()}`;
+    return `${url}${char}_=${O.now}`;
   },
 
   rf(file, isBinary, cb=null){
@@ -2712,16 +2655,22 @@ const O = {
     O.rf(`/projects/${O.project}/${file}`, isBinary, cb);
   },
 
+  async readFile(file){
+    if(O.isNode || O.isElectron) return O.rfs(file, 1);
+    return O.rfAsync(file);
+  },
+
   async req(path){
-    const cache = O.module.cache;
+    const {cache} = O.module;
     const pathOrig = path;
 
-    let data, type;
+    let type = 0;
+    let data = null;
 
     if(path in cache) return cache[path];
 
-    if(path.endsWith('.js')){
-      data = await O.rfAsync(path);
+    if(/\.[^\/]+$/.test(path)){
+      data = await O.rfAsync(path, path.endsWith('.hex'));
     }else if((data = await O.rfAsync(`${path}.js`)) !== null){
       type = 2;
       path += '.js';
@@ -2735,22 +2684,30 @@ const O = {
       path += '.json';
       if(path in cache) return cache[path];
     }else if((data = await O.rfAsync(`${path}.txt`)) !== null){
-      type = 0;
       path += '.txt';
       if(path in cache) return cache[path];
     }else if((data = await O.rfAsync(`${path}.md`)) !== null){
-      type = 0;
       path += '.md';
       if(path in cache) return cache[path];
+    }else if((data = await O.rfAsync(`${path}.glsl`)) !== null){
+      path += '.glsl';
+      if(path in cache) return cache[path];
+    }else if((data = await O.rfAsync(`${path}.hex`, 1)) !== null){
+      path += '.hex';
+      if(path in cache) return cache[path];
     }else{
-      O.error(`Failed to load data for project ${JSON.stringify(O.project)}`);
-      return null;
+      throw new TypeError(`Cannot find ${O.sf(pathOrig)}`);
     }
 
+    const pathMatch = path;
     path = path.split('/');
     path.pop();
 
-    const module = {exports: {}};
+    cache[pathOrig] = {};
+    const module = {
+      get exports(){ return cache[pathOrig]; },
+      set exports(val){ cache[pathOrig] = val; }
+    };
 
     switch(type){
       case 0: // Text
@@ -2762,23 +2719,56 @@ const O = {
         break;
 
       case 2: // JavaScript
-        data = data
-          .replace(/^const (?:O|debug) .+/gm, '')
-          .replace(/ \= require\(/g, ' \= await require(');
+        data = data.
+          replace(/^const (?:O|debug) = require\(.+\s*/gm, '').
+          replace(/ = require\(/g, ' = await require(');
 
-        const AsyncFunction = (async () => {}).constructor;
-        const func = new AsyncFunction('window', 'document', 'Function', 'O', 'require', 'module', 'exports', data);
+        let func = null;
 
-        await func(window, document, Function, O, require, module, module.exports);
+        const constructFunc = () => {
+          return new Function(
+            'window',
+            'document',
+            'Function',
+            'O',
+            'exports',
+            'require',
+            'module',
+            '__filename',
+            '__dirname',
+
+            `return(async()=>{\n${data}\n})();`,
+          );
+        };
+
+        try{
+          func = constructFunc();
+        }catch(err){
+          setTimeout(() => constructFunc());
+          console.error(`Syntax error in ${O.sf(pathOrig)}`);
+          throw err;
+        }
+
+        await func(
+          window,
+          document,
+          Function,
+          O,
+          module.exports,
+          require,
+          module,
+          pathMatch,
+          path.join('/'),
+        );
         break;
     }
 
-    return cache[pathOrig] = module.exports;
+    return module.exports;
 
     async function require(newPath){
       var resolvedPath;
 
-      if(/^https?\:\/\//.test(newPath)){
+      if(/^(?:\/|https?\:\/\/|[^\.][\s\S]*\/)/.test(newPath)){
         resolvedPath = newPath;
       }else if(newPath.startsWith('.')){
         var oldPath = path.slice();
@@ -2793,7 +2783,7 @@ const O = {
 
         resolvedPath = oldPath.join('/');
       }else{
-        return null;
+        return O.modulesPolyfill[newPath];
       }
 
       var exportedModule = await O.req(resolvedPath);
@@ -2865,11 +2855,23 @@ const O = {
     return O.ca(len, i => O.sfcc(cc + i)).join('');
   },
 
+  ftext(str){
+    let lines = O.sanl(str);
+    lines = lines.slice(1, lines.length - 1);
+
+    const pad = lines
+      .filter(line => line.trim().length !== 0)
+      .reduce((pad, line, i) => Math.min(pad, line.match(/^\s+/)[0].length), Infinity);
+
+    return lines.map(line => line.slice(pad)).join('\n');
+  },
+
   indent(str, indent){ return `${' '.repeat(indent << 1)}${str}`; },
   setLineBreak(str, lineBreak){ return str.replace(/\r\n|\r|\n/g, lineBreak); },
   cr(str){ return O.setLineBreak(str, '\r'); },
   lf(str){ return O.setLineBreak(str, '\n'); },
   crlf(str){ return O.setLineBreak(str, '\r\n'); },
+  rev(str){ return str.split('').reverse().join(''); },
 
   /*
     Array functions
@@ -2937,13 +2939,17 @@ const O = {
     return arr[arr.length - 1];
   },
 
+  fst(set, defaultVal){ return O.first(set, defaultVal); },
+
   /*
     Random number generator
   */
 
   enhanceRNG(sym){
+    /*O.noimpl('enhanceRNG');
+
     if(sym !== O.symbols.enhanceRNG)
-      throw new TypeError('Function "enhanceRNG" should not be called explicitly');
+      throw new TypeError('Function "enhanceRNG" should not be called explicitly');*/
 
     O.enhancedRNG = 1;
     O.randState = O.Buffer.from(O.ca(32, () => Math.random() * 256));
@@ -2966,7 +2972,7 @@ const O = {
     if(O.rseed !== null){
       write(O.rseed);
     }else{
-      write(O.now());
+      write(O.now);
       write(Math.random() * 2 ** 64);
     }
 
@@ -3031,8 +3037,8 @@ const O = {
   },
 
   sleep(time){
-    const t = O.now();
-    while(O.now() - t < time);
+    const t = O.now;
+    while(O.now - t < time);
   },
 
   sleepa(time){
@@ -3078,9 +3084,8 @@ const O = {
   },
 
   dist(x1, y1, x2, y2){
-    var dx = x2 - x1;
-    var dy = y2 - y1;
-
+    const dx = x2 - x1;
+    const dy = y2 - y1;
     return Math.sqrt(dx * dx + dy * dy);
   },
 
@@ -3095,9 +3100,20 @@ const O = {
     return obj;
   },
 
+  await(func, timeout=0){
+    return new Promise(res => {
+      const test = async () => {
+        if(await func()) return res();
+        setTimeout(test, timeout);
+      };
+
+      test();
+    });
+  },
+
   while(func){
     return new Promise(res => {
-      var test = async () => {
+      const test = async () => {
         if(await func()) return setTimeout(test);
         res();
       };
@@ -3162,11 +3178,22 @@ const O = {
     return O.Buffer.from(arr);
   },
 
+  date(date=O.now){
+    date = new Date(date);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hour = String(date.getHours()).padStart(2, '0');
+    const minute = String(date.getMinutes()).padStart(2, '0');
+
+    return `${day}.${month}.${year}. ${hour}:${minute}`;
+  },
+
   bool(val){ return Boolean(O.int(val)); },
   sortAsc(arr){ return arr.sort((elem1, elem2) => elem1 > elem2 ? 1 : elem1 < elem2 ? -1 : 0); },
   sortDesc(arr){ return arr.sort((elem1, elem2) => elem1 > elem2 ? -1 : elem1 < elem2 ? 1 : 0); },
   undupe(arr){ return arr.filter((a, b, c) => c.indexOf(a) === b); },
-  raf(func){ return window.requestAnimationFrame(func); },
   obj(proto=null){ return Object.create(proto); },
   keys(obj){ return Reflect.ownKeys(obj); },
   cc(char, index=0){ return char.charCodeAt(index); },
@@ -3177,9 +3204,30 @@ const O = {
   sf(val){ return JSON.stringify(val, null, 2); },
   rev(str){ return str.split('').reverse().join(''); },
   has(obj, key){ return Object.hasOwnProperty.call(obj, key); },
-  desc(obj, key){ return Object.getOwnPropertyDescriptor.call(obj, key); },
-  now(){ return Date.now(); },
-  gmt(){ return new Date().toGMTString(); },
+  desc(obj, key){ return Object.getOwnPropertyDescriptor(obj, key); },
+
+  /*
+    Time simulation
+  */
+
+  get now(){
+    if(O.isElectron) return O.time;
+    return Date.now();
+  },
+
+  raf(func){
+    if(O.isElectron) O.animFrameCbs.push(func);
+    else window.requestAnimationFrame(func);
+    return func;
+  },
+
+  animFrame(){
+    const cbs = O.animFrameCbs;
+    const cbsCopy = cbs.slice();
+
+    cbs.length = 0;
+    for(const cb of cbsCopy) cb();
+  },
 
   /*
     Node functions
@@ -3188,6 +3236,28 @@ const O = {
   rfs(file, str=0){ return O.nm.fs.readFileSync(file, str ? 'utf8' : null); },
   wfs(file, data){ return O.nm.fs.writeFileSync(file, data); },
   ext(file){ return O.nm.path.parse(file).ext.slice(1); },
+
+  /*
+    Modules polyfill
+  */
+
+  modulesPolyfill: (() => {
+    const modules = {
+      path: {
+        normalize(p){
+          return p.replace(/[\\]/g, '/');
+        },
+
+        join(p1, p2){
+          return p1.split(/[\/\\]/).
+            concat(p2.split(/[\/\\]/)).
+            join('/').replace(/\/+/g, '/');
+        },
+      },
+    };
+
+    return modules;
+  }),
 
   /*
     Events
@@ -3200,7 +3270,7 @@ const O = {
       target = window;
     }
 
-    return target.addEventListener(type, func);
+    return target.addEventListener(type, func, {passive: 0});
   },
 
   rel(target, type, func=null){
@@ -3423,7 +3493,7 @@ const O = {
   })(),
 
   base64: (() => {
-    const encode = data => {
+    const encode = (data, mode=0) => {
       const buf = O.Buffer.from(data);
 
       let str = '';
@@ -3432,32 +3502,42 @@ const O = {
       buf.forEach((byte, i) => {
         switch(i % 3){
           case 0:
-            str += char(byte >> 2);
+            str += char(byte >> 2, mode);
             val = (byte & 3) << 4;
             break;
 
           case 1:
-            str += char((byte >> 4) | val);
+            str += char((byte >> 4) | val, mode);
             val = (byte & 15) << 2;
             break;
 
           case 2:
-            str += char((byte >> 6) | val);
-            str += char(byte & 63);
+            str += char((byte >> 6) | val, mode);
+            str += char(byte & 63, mode);
             break;
         }
       });
 
       const m = buf.length % 3;
-      if(m !== 0) str += char(val) + '='.repeat(3 - m);
+
+      if(m !== 0){
+        str += char(val);
+        if(mode === 0) str += '='.repeat(3 - m);
+      }
 
       return str;
     };
 
-    const decode = str => {
-      const pad = str.match(/\=*$/)[0].length;
-      const extraBytes = pad !== 0 ? pad : 0;
-      const len = (str.length >> 2) * 3 - extraBytes;
+    const decode = (str, mode=0) => {
+      let length = (str.length >> 2) * 3;
+
+      if(mode === 0){
+        const pad = str.match(/\=*$/)[0].length;
+        const extraBytes = pad !== 0 ? pad : 0;
+        length -= extraBytes;
+      }
+
+      const len = length;
       const buf = O.Buffer.alloc(len);
 
       str += str;
@@ -3470,19 +3550,19 @@ const O = {
 
         switch(i % 3){
           case 0:
-            byte = ord(str[j++]) << 2;
-            val = ord(str[j++]);
+            byte = ord(str[j++], mode) << 2;
+            val = ord(str[j++], mode);
             byte |= val >> 4;
             break;
 
           case 1:
             byte = val << 4;
-            val = ord(str[j++]);
+            val = ord(str[j++], mode);
             byte |= val >> 2;
             break;
 
           case 2:
-            byte = (val << 6) | ord(str[j++]);
+            byte = (val << 6) | ord(str[j++], mode);
             break;
         }
 
@@ -3492,9 +3572,9 @@ const O = {
       return buf;
     };
 
-    const char = ord => {
-      if(ord === 62) return '+';
-      if(ord === 63) return '/';
+    const char = (ord, mode) => {
+      if(ord === 62) return mode ? '-' : '+';
+      if(ord === 63) return mode ? '_' : '/';
 
       return O.sfcc(ord + (
         ord < 26 ? 65 :
@@ -3503,9 +3583,9 @@ const O = {
       ));
     };
 
-    const ord = char => {
-      if(char === '+') return 62;
-      if(char === '/') return 63;
+    const ord = (char, mode) => {
+      if(char === (mode ? '-' : '+')) return 62;
+      if(char === (mode ? '_' : '/')) return 63;
 
       const cc = O.cc(char);
 
@@ -3518,6 +3598,19 @@ const O = {
 
     return {encode, decode};
   })(),
+
+  // Exit
+
+  exit(...args){
+    if(!(O.isNode || O.isElectron))
+      throw new TypeError('Only Node.js and Electron processes can be terminated');
+
+    if(args.length !== 0)
+      log(...args);
+
+    if(O.isNode) O.proc.exit();
+    else setTimeout(() => window.close(), 500);
+  },
 
   // Function which does nothing
 

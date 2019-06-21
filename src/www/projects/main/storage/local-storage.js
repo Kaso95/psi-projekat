@@ -2,8 +2,13 @@
 
 const EnhancedStorage = require('./enhanced-storage');
 
+const DEFAULT_LANGUAGE = 'sr-cyrl-rs';
+
 const keys = [
   'token',
+  'nick',
+  'isMod',
+  'lang',
 ];
 
 class LocalStorage extends EnhancedStorage{
@@ -12,35 +17,48 @@ class LocalStorage extends EnhancedStorage{
   }
 
   init(){
-    const state = O.obj();
-    this.state = state;
+    const state = this.state = O.obj();
 
     state.token = null;
+    state.nick = null;
+    state.isMod = null;
+    state.lang = DEFAULT_LANGUAGE;
+
+    return this;
   }
 
   ser(ser=new O.Serializer()){
     const {state} = this;
 
-    if(state.token){
+    if(state.token !== null){
       ser.write(1);
-      ser.writeBuf(state.token);
+      ser.writeStr(state.token);
+      ser.writeStr(state.nick);
+      ser.write(state.isMod);
     }else{
       ser.write(0);
     }
+
+    ser.writeStr(state.lang);
 
     return ser;
   }
 
   deser(ser){
-    const state = O.obj();
-    this.state = state;
+    const {state} = this.init();
 
-    state.token = ser.read() ? ser.readBuf() : null;
+    if(ser.read()){
+      state.token = ser.readStr();
+      state.nick = ser.readStr();
+      state.isMod = ser.read();
+    }
+
+    state.lang = ser.readStr();
 
     return this;
   }
 
   get signedIn(){ return this.token !== null; }
-};
+}
 
 module.exports = LocalStorage;

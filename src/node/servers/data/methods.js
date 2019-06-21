@@ -3,20 +3,51 @@
 const fs = require('fs');
 const path = require('path');
 const O = require('../../omikron');
-const php = require('../../php');
 const hash = require('../../hash');
+const php = require('../../php');
+const echo = require('../../echo');
+const avatar = require('../../avatar');
+const Token = require('../../token');
+const langsList = require('../../prog-langs/langs-list');
 const Captcha = require('./captcha');
-const Token = require('./token');
+const check = require('./check');
+const editableData = require('./editable-user-data');
+
+const ALLOW_DELETING_PROFILE = 1;
+
+const SCRIPT_IDENTIFIER = 'ai-playground.user-script';
+const SCRIPT_VERSION = 1;
 
 const methods = {
-  async getHomePagePosts(){
-    // Not implemented yet
-    return [];
+  async echo(str){
+    if(!check.str(str)) throw 'data';
+
+    const buf = Buffer.from(str, 'base64');
+    const token = echo.set(buf);
+
+    return token;
   },
 
-  async getCompetitions(token){
-    // Not implemented yet
-    return [];
+  async getPosts(keywords){
+    if(!check.text(keywords)) throw 'data';
+    return await php.exec('getPosts', {keywords});
+  },
+
+  async getCompetitions(token, keywords){
+    if(!check.tokenn(token)) throw 'data';
+    if(!check.text(keywords)) throw 'data';
+    return await php.exec('getCompetitions', {token, keywords});
+  },
+
+  async getFunctionalities(token, keywords){
+    if(!check.tokenn(token)) throw 'data';
+    if(!check.text(keywords)) throw 'data';
+    return await php.exec('getFunctionalities', {token, keywords});
+  },
+
+  async getUsers(keywords){
+    if(!check.sstr(keywords)) throw 'data';
+    return await php.exec('getUsers', {keywords});
   },
 
   async getCaptcha(){
@@ -26,56 +57,9 @@ const methods = {
   },
 
   async register(nick, email, pass, captchaToken, captchaStr){
-    /*
-      Ensure that the nick name:
-        1. is a string
-        2. is not longer than 32 characters
-        3. consists of lower case letters or numebrs separated by optional hyphens
-      Valid examples:
-        a
-        5
-        xy
-        some-user
-        a-b-c-d
-    */
-    if(!isStr(nick) || nick.length > 32 || !/^[a-z0-9]+(?:\-[a-z0-9]+)*$/.test(nick))
-      throw 'invalidNick';
-
-    /*
-      Ensure that the email:
-        1. is a string
-        2. is not longer than 1024 characters
-        3. consists of lower case letters or numebrs separated by exactly one "@" symbol
-      Valid examples:
-        user@website
-        a.b.c@dd.ee
-        ...@x.y.z
-        ----@--
-    */
-    if(!isStr(email) || email.length > 1024 || !/^[a-z0-9\-\.]+\@[a-z0-9\-\.]+$/.test(email))
-      throw 'invalidEmail';
-
-    /*
-      Ensure that the password:
-        1. is a string
-        2. is not shorter than 8 characters
-        3. is not longer than 64 characters
-        4. consists of printable ASCII characters (including spaces)
-        5. has at least one lower case letter
-        6. has at least one upper case letter
-        7. has at least one digit
-      Valid examples:
-        abcdefX7
-        aaAA3333
-        2 + 3 x B
-    */
-    if(!isStr(pass) || pass.length < 8 || pass.length > 64 || (
-      /^[ ~]+$/.test(pass) && !(
-        /[a-z]/.test(pass) &&
-        /[A-Z]/.test(pass) &&
-        /[0-9]/.test(pass)
-      )
-    )) throw 'invalidPass';
+    if(!check.nick(nick)) throw 'invalidNick';
+    if(!check.email(email)) throw 'invalidEmail';
+    if(!check.pass(pass)) throw 'invalidPass';
 
     /*
       Check the captcha validity.
@@ -86,12 +70,12 @@ const methods = {
     */
     {
       const msg = 'invalidCaptcha';
-      if(!isStr(captchaToken)) throw msg;
+      if(check.nstr(captchaToken)) throw msg;
 
       const captcha = Captcha.get(captchaToken);
       if(captcha === null) throw msg;
 
-      const ok = typeof captchaStr === 'string' && captcha.check(captchaStr);
+      const ok = check.str(captchaStr) && captcha.check(captchaStr);
       captcha.invalidate();
       if(!ok) throw msg;
     }
@@ -105,18 +89,121 @@ const methods = {
       email,
       passHash: hash(pass, 'sha512').toString('base64'),
     });
+  },
 
-    /*
-      TODO: Registration was successfull, now we need to automatically
-      login the user and send the token, but since login is not implemented
-      yet, we only return the string "ok"
-    */
-    return 'ok';
+  async login(nick, pass){
+    if(check.nstr(nick) || check.nstr(pass)) throw 'data';
+
+    const token = Token.generate();
+    const data = await php.exec('login', {
+      nick,
+      passHash: hash(pass, 'sha512').toString('base64'),
+      token,
+    });
+
+    data.token = token;
+    return data;
+  },
+
+  async logout(token){
+    if(!check.token(token)) throw 'data';
+    await php.exec('logout', {token});
+  },
+
+  async getUserData(nick){
+    if(!check.nick(nick)) throw 'data';
+    return await php.exec('getUserData', {nick});
+  },
+
+  async applyForCompetition(token, idComp, scriptData){
+    if(!check.token(token)) throw 'data';
+    if(!check.id(idComp)) throw 'data';
+    if(!check.str(scriptData)) throw 'data';
+
+    const msg = 'invalidScript';
+    const buf = Buffer.from(scriptData, 'base64');
+    let s = null;
+
+    try{ s = new O.Serializer(buf, 1); }catch{}
+    if(s === null) throw msg;
+
+    const ser = s;
+    if(ser.readStr() !== SCRIPT_IDENTIFIER) throw msg;
+    if(ser.readUint() !== SCRIPT_VERSION) throw msg;
+
+    const lang = ser.readStr();
+    if(!O.has(langsList, lang)) throw msg;
+
+    const script = ser.readStr();
+    await php.exec('applyForCompetition', {token, idComp, lang, script});
+  },
+
+  async giveUpFromCompetition(token, idComp){
+    if(!check.token(token)) throw 'data';
+    if(!check.id(idComp)) throw 'data';
+    await php.exec('giveUpFromCompetition', {token, idComp});
+  },
+
+  async upgradeFunctionality(token, idFunc){
+    if(!check.token(token)) throw 'data';
+    if(!check.id(idFunc)) throw 'data';
+    await php.exec('upgradeFunctionality', {token, idFunc});
+  },
+
+  async addPost(token, content){
+    if(!check.token(token)) throw 'data';
+    if(!check.text(content)) throw 'data';
+    await php.exec('addPost', {token, content});
+  },
+
+  async addCompetition(token, title, desc, startDate, maxUsers){
+    if(!check.token(token)) throw 'data';
+    if(!check.sstr(title)) throw 'data';
+    if(!check.date(startDate)) throw 'data';
+    if(!check.int(maxUsers, 1, 1e5)) throw 'invalidNum';
+    await php.exec('addCompetition', {token, title, desc, startDate, maxUsers});
+  },
+
+  async editUserData(token, type, val){
+    if(!check.token(token)) throw 'data';
+    if(!check.str(type)) throw 'data';
+    if(!check.str(val)) throw 'data';
+
+    if(!O.has(editableData, type)){
+      if(type === 'avatar'){
+        const nick = await php.exec('getNickFromToken', {token});
+        const buf = Buffer.from(val, 'base64');
+        return await avatar.update(nick, buf);
+      }
+
+      throw 'data';
+    }
+
+    val = val.trim();
+    if(val.length > editableData[type]) throw 'data';
+    else if(val.length === 0) val = null;
+
+    await php.exec('editUserData', {token, type, val});
+  },
+
+  async turnIntoMod(token, nick){
+    if(!check.token(token)) throw 'data';
+    if(!check.sstr(nick)) throw 'data';
+    await php.exec('turnIntoMod', {token, nick});
+  },
+
+  async deleteOwnProfile(token){
+    if(!ALLOW_DELETING_PROFILE) throw 'forbidden';
+    if(!check.token(token)) throw 'data';
+    await php.exec('deleteOwnProfile', {token});
+  },
+
+  async deleteOtherProfile(token, nick){
+    if(!ALLOW_DELETING_PROFILE) throw 'forbidden';
+    if(!check.token(token)) throw 'data';
+    if(!check.sstr(nick)) throw 'data';
+    await php.exec('deleteOtherProfile', {token, nick});
   },
 };
 
 module.exports = methods;
-
-function isStr(val){
-  return typeof val === 'string';
-}

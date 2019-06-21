@@ -18,8 +18,8 @@ class Navbar extends Element.Div{
         ['language', 'language'],
       ],
       right: O.lst.signedIn ? [
-        ['signOut', 'signOut'],
-        ['profile', 'profile'],
+        ['logout', null],
+        ['profile', `users/${O.lst.nick}`],
       ] : [
         ['register', 'register'],
         ['login', 'login'],
@@ -52,6 +52,6 @@ class Navbar extends Element.Div{
   }
 
   css(){ return 'navbar'; }
-};
+}
 
 module.exports = Navbar;

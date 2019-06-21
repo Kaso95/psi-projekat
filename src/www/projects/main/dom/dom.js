@@ -8,6 +8,8 @@ const PageContent = require('./page-content');
 const pages = require('./pages');
 const modals = require('./modals');
 
+const MODAL_TRANSITION_DURATION = 500;
+
 /*
   Document Object Model.
   This class is used for all operations with HTML elements.
@@ -16,6 +18,8 @@ const modals = require('./modals');
 */
 
 class DOM extends Element{
+  #page = null;
+
   constructor(main, modal, init=1){
     super();
 
@@ -29,7 +33,6 @@ class DOM extends Element{
     // Elements
     this.navbar = null;
     this.pageContent = null;
-    this.page = null;
     this.modalInner = null;
 
     this.loading = 0;
@@ -59,7 +62,20 @@ class DOM extends Element{
     });
   }
 
-  reload(){
+  get page(){
+    return this.#page;
+  }
+
+  set page(page){
+    if(this.#page !== null)
+      this.#page.emit('remove');
+
+    this.#page = page;
+  }
+
+  reload(hard=0){
+    if(hard) return location.reload();
+
     this.loadPage().then(() => {
       this.loading = 0;
       O.raf(() => this.emit('load'));
@@ -85,7 +101,7 @@ class DOM extends Element{
     this.modalCb = cb;
   }
 
-  closeModal(){
+  closeModal(cb=null){
     if(!this.modalOpen) return;
 
     const {main, modal, modalInner: inner} = this;
@@ -98,6 +114,9 @@ class DOM extends Element{
     this.modalCb.call(null);
     this.modalCb = null;
     this.modalOpen = 0;
+
+    if(cb !== null)
+      setTimeout(cb.bind(null, null), MODAL_TRANSITION_DURATION);
   }
 
   onModalKeydown(evt){
@@ -111,6 +130,7 @@ class DOM extends Element{
   }
 
   alert(msg, cb){
+    if(typeof msg !== 'string') msg = O.sf(msg);
     const modal = new modals.Alert(this.modalInner, msg);
     this.openModal(cb);
   }
@@ -119,12 +139,50 @@ class DOM extends Element{
     this.alert(LS.errors.noimpl, cb);
   }
 
+  succ(msg, cb){
+    this.alert(LS.succ.query[msg], cb);
+  }
+
+  err(err, cb){
+    const errs = LS.errors;
+
+    if(err instanceof Error){
+      err = err.stack;
+    }else if(typeof err === 'string'){
+      if(O.has(errs, err)) err = errs[err];
+      else if(O.has(errs.query, err)) err = errs.query[err];
+    }
+
+    this.alert(err, cb);
+  }
+
+  handle(promise, path=null, hardReload=0){
+    promise.then(() => {
+      if(path === null) this.reload(hardReload);
+      else this.nav(path);
+    }, this.err.bind(this));
+  }
+
   createNavbar(){
     const navbar = new Navbar(this.main);
     this.navbar = navbar;
 
     navbar.on('click', (name, elem, evt) => {
-      this.navigate(elem.path);
+      if(elem.path !== null)
+        return this.nav(elem.path);
+
+      switch(name){
+        case 'logout':
+          const {token} = O.lst;
+          O.lst.token = null;
+
+          backend.logout(token).then(() => {
+            location.reload();
+          }, err => {
+            this.err(err, () => location.reload());
+          });
+          break;
+      }
     });
   }
 
@@ -132,10 +190,69 @@ class DOM extends Element{
     this.pageContent = new PageContent(this.main);
   }
 
-  navigate(path){
+  nav(path){
     const url = path !== '' ? `/?path=${path}` : '/';
     history.pushState(null, path, url);
     this.reload();
+  }
+
+  openFile(cb){
+    const fileInput = O.doc.createElement('input');
+    fileInput.type = 'file';
+
+    const ret = cb.bind(null, null);
+    const err = name => this.err(name, ret);
+
+    const onInput = () => {
+      const {files} = fileInput;
+      if(files.length === 0) return ret();
+      if(files.length > 1) return err('multipleFiles');
+
+      const file = files[0];
+      const reader = new FileReader();
+
+      O.ael(reader, 'load', evt => {
+        this.closeModal(() => {
+          const {result} = reader;
+          const str = result.slice(result.indexOf(',') + 1);
+
+          cb(str);
+        });
+      });
+
+      O.ael(reader, 'error', evt => {
+        this.closeModal(() => {
+          err('cannotLoadFile');
+        });
+      });
+
+      this.alert(LS.messages.loadingFile);
+
+      setTimeout(() => {
+        reader.readAsDataURL(file);
+      }, MODAL_TRANSITION_DURATION);
+    };
+
+    const onFocus = () => {
+      O.rel('focus', onFocus);
+
+      const t = O.now;
+
+      const check = () => {
+        const {files} = fileInput;
+
+        if(files.length !== 0) return onInput();
+        if(O.now - t > 1e3) return ret();
+
+        O.raf(check);
+      };
+
+      O.raf(check);
+    };
+
+    O.ael('focus', onFocus);
+
+    fileInput.click();
   }
 
   async loadPage(){
@@ -151,67 +268,73 @@ class DOM extends Element{
     const len = path.length;
 
     this.pageContent.clear();
+    this.page = null;
 
     if(len === 0){
       await this.createHomePage();
       return;
     }
 
-    if(len === 1){
-      switch(path[0]){
-        case 'sandbox':
-          await this.createSandboxPage();
-          break;
+    switch(path[0]){
+      case 'sandbox':
+        if(len !== 1) return await e404();
+        await this.createSandboxPage();
+        break;
 
-        case 'competition':
-          await this.createCompetitionPage();
-          break;
+      case 'competition':
+        if(len !== 1) return await e404();
+        await this.createCompetitionPage();
+        break;
 
-        case 'search':
-          await this.createSearchPage();
-          break;
+      case 'search':
+        if(len !== 1) return await e404();
+        await this.createSearchPage();
+        break;
 
-        case 'help':
-          await this.createHelpPage();
-          break;
+      case 'help':
+        if(len !== 1) return await e404();
+        await this.createHelpPage();
+        break;
 
-        case 'language':
-          await this.createLanguagePage();
-          break;
+      case 'language':
+        if(len !== 1) return await e404();
+        await this.createLanguagePage();
+        break;
 
-        case 'register':
-          await this.createRegisterPage();
-          break;
+      case 'register':
+        if(len !== 1) return await e404();
+        await this.createRegisterPage();
+        break;
 
-        case 'login':
-          await this.createLoginPage();
-          break;
+      case 'login':
+        if(len !== 1) return await e404();
+        await this.createLoginPage();
+        break;
 
-        case 'error':
-          const status = O.urlParam('status');
-          const info = O.urlParam('info');
-          await this.createError(status, info);
-          break;
+      case 'users':
+        if(len !== 2) return await e404();
+        await this.createUserProfilePage(path[1]);
+        break;
 
-        default: await e404(); break;
-      }
-      return;
+      case 'error':
+        if(len !== 1) return await e404();
+        const status = O.urlParam('status');
+        const info = O.urlParam('info');
+        await this.createError(status, info);
+        break;
+
+      default: await e404(); break;
     }
-
-    await e404();
   }
 
   async createHomePage(){
     const page = new pages.Home(this.pageContent);
     this.page = page;
 
-    const posts = await backend.getHomePagePosts();
+    const posts = await backend.getPosts('');
 
     for(const post of posts){
-      const user = post.user;
-      const date = new Date(+post.date);
-      const content = post.content;
-
+      const {user, date, content} = post;
       page.createPost(user, date, content);
     }
   }
@@ -225,24 +348,12 @@ class DOM extends Element{
     const page = new pages.CompetitionPage(this.pageContent);
     this.page = page;
 
-    const comps = await backend.getCompetitions(0);
+    const comps = await backend.getCompetitions(O.lst.token, '');
 
     for(const comp of comps){
-      const title = comp.title;
-      const date = new Date(+comp.date);
-      const desc = comp.desc;
-      const applied = comp.applied;
-
-      page.createCompetition(title, date, desc, applied);
+      const {id, title, date, desc, maxUsers, currentUsers, applied} = comp;
+      page.createCompetition(id, title, date, desc, maxUsers, currentUsers, applied);
     }
-
-    page.on('stateChange', (comp, applied) => {
-      this.alert(`${
-        applied ?
-        LS.labels.competition.msgs.applied :
-        LS.labels.competition.msgs.gaveUp
-      } ${O.sf(comp.getTitle())}`);
-    });
   }
 
   async createSearchPage(){
@@ -270,11 +381,29 @@ class DOM extends Element{
     this.page = page;
   }
 
+  async createUserProfilePage(nick){
+    let data = null;
+
+    try{
+      data = await backend.getUserData(nick);
+    }catch(err){
+      if(err === '404') this.createError(404);
+      else this.err(err);
+      return;
+    }
+
+    data.nick = nick;
+    data.registrationDate = O.date(data.registrationDate);
+
+    const page = new pages.UserProfile(this.pageContent, data);
+    this.page = page;
+  }
+
   async createError(status, msg=null){
     const page = new pages.Error(this.pageContent, status, msg);
     this.page = page;
   }
-};
+}
 
 DOM.Element = Element;
 

@@ -23,9 +23,11 @@ module.exports = {
 async function exec(query, args=null){
   await sem.wait();
 
+  query = query.replace(/[A-Z]/g, a => `-${a.toLowerCase()}`);
+
   return new Promise((res, rej) => {
     const proc = cp.spawn(config.exe.php, [
-      '-d', 'display-errors=On',
+      '-d', 'display_errors=stderr',
       'main.php',
     ], {
       cwd: phpDir,
@@ -65,7 +67,7 @@ async function exec(query, args=null){
       if(data.error !== null) return rej(data.error);
 
       res(data.data);
-    })
+    });
 
     proc.on('error', rej);
 

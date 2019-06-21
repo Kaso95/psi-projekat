@@ -1,15 +1,17 @@
 'use strict';
 
-const DEBUG = 0;
-
 const fs = require('fs');
 const path = require('path');
 const electron = require('electron');
 
-const s = 500;
+const DEBUG = process.argv.includes('visual');
+
+const size = 500;
 
 const cwd = process.cwd();
 const mainFile = path.join(cwd, process.argv[2]);
+
+const args = process.argv.slice(3);
 
 electron.app.once('ready', main);
 
@@ -20,10 +22,11 @@ function main(){
   ipc.on('info', (evt, args) => console.info.apply(null, args));
   ipc.on('error', (evt, args) => console.error.apply(null, args));
   ipc.on('logRaw', (evt, data) => logRaw(data));
+  ipc.on('getArgs', (evt, data) => evt.sender.send('args', args));
 
   const win = new electron.BrowserWindow({
-    width: s,
-    height: s,
+    width: size,
+    height: size,
     show: false,
     webPreferences: {
       nodeIntegration: true,
@@ -46,4 +49,8 @@ function main(){
 
 function logRaw(data){
   process.stdout.write(data);
+}
+
+function log(...args){
+  console.log(...args);
 }

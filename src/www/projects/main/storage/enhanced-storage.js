@@ -1,5 +1,7 @@
 'use strict';
 
+const VERSION = 0;
+
 class EnhancedStorage extends O.Storage{
   constructor(legacy, project, keys=[]){
     super(legacy, project);
@@ -18,9 +20,9 @@ class EnhancedStorage extends O.Storage{
     }
   }
 
-  static get version(){ return 0; }
+  static get version(){ return VERSION; }
 
   init(){ O.virtual('init'); }
-};
+}
 
 module.exports = EnhancedStorage;

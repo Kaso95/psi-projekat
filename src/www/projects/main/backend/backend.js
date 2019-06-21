@@ -11,10 +11,25 @@ const server = require('./server');
 */
 
 const methods = [
-  'getHomePagePosts',
+  'echo',
+  'getPosts',
   'getCompetitions',
+  'getFunctionalities',
+  'getUsers',
   'getCaptcha',
   'register',
+  'login',
+  'logout',
+  'getUserData',
+  'applyForCompetition',
+  'giveUpFromCompetition',
+  'upgradeFunctionality',
+  'addPost',
+  'addCompetition',
+  'editUserData',
+  'turnIntoMod',
+  'deleteOwnProfile',
+  'deleteOtherProfile',
 ];
 
 module.exports = initMethods(methods);

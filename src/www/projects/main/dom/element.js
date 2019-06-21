@@ -31,9 +31,7 @@ class Element extends O.EventEmitter{
   // Add event listener wrapper
   ael(type, func){
     O.ael(this.elem, type, evt => {
-      evt.preventDefault();
-      evt.stopPropagation();
-
+      O.pd(evt);
       func(evt);
     });
   }
@@ -74,19 +72,19 @@ class Element extends O.EventEmitter{
 
   tag(){ O.virtual('tag'); } // Tag name
   css(){ O.virtual('css'); } // CSS style
-};
+}
 
 class Div extends Element{
   tag(){ return 'div'; }
-};
+}
 
 class Left extends Div{
   css(){ return 'left'; }
-};
+}
 
 class Right extends Div{
   css(){ return 'right'; }
-};
+}
 
 class Text extends Element{
   constructor(parent, text=''){
@@ -95,11 +93,11 @@ class Text extends Element{
   }
 
   css(){ return 'text'; }
-};
+}
 
 class Span extends Text{
   tag(){ return 'span'; }
-};
+}
 
 class Input extends Element{
   constructor(parent, name=null, placeholder=null){
@@ -117,21 +115,21 @@ class Input extends Element{
 
   tag(){ return 'input'; }
   css(){ return 'input'; }
-};
+}
 
 class InputText extends Input{
   constructor(parent, name, placeholder){
     super(parent, name, placeholder);
     this.elem.type = 'text';
   }
-};
+}
 
 class InputPass extends Input{
   constructor(parent, name, placeholder){
     super(parent, name, placeholder);
     this.elem.type = 'password';
   }
-};
+}
 
 class InputTextarea extends Input{
   constructor(parent, name, placeholder, val=''){
@@ -141,7 +139,7 @@ class InputTextarea extends Input{
 
   tag(){ return 'textarea'; }
   css(){ return 'textarea'; }
-};
+}
 
 class InputDropdown extends Input{
   constructor(parent, name, opts=[], selected=null){
@@ -150,9 +148,6 @@ class InputDropdown extends Input{
     for(const [label, desc] of opts)
       this.addOpt(label, desc, label === selected);
   }
-
-  get val(){ O.noimpl('val (getter)'); }
-  set val(val){ O.noimpl('val (setter)'); }
 
   addOpt(label, desc, selected=0){
     const opt = O.ce(this.elem, 'option');
@@ -163,16 +158,25 @@ class InputDropdown extends Input{
 
   tag(){ return 'select'; }
   css(){ return 'dropdown'; }
-};
+}
+
+class InputFile extends Input{
+  constructor(parent, name){
+    super(parent, name);
+    this.elem.type = 'file';
+  }
+
+  css(){ return 'input-file'; }
+}
 
 class Link extends Text{
   constructor(parent, text, url='javascript:void(0)'){
-    super(parent);
-    this.href = url;
+    super(parent, text);
+    this.elem.href = url;
   }
 
   tag(){ return 'a'; }
-};
+}
 
 class Heading extends Text{
   constructor(parent, text, size=1){
@@ -187,19 +191,19 @@ class Heading extends Text{
   }
 
   css(){ return 'heading'; }
-};
+}
 
 class Title extends Heading{
   css(){ return 'title'; }
-};
+}
 
 class Rectangle extends Div{
   css(){ return 'rect'; }
-};
+}
 
 class Region extends Rectangle{
   css(){ return 'region'; }
-};
+}
 
 class Button extends Span{
   constructor(parent, text){
@@ -214,7 +218,7 @@ class Button extends Span{
   }
 
   css(){ return 'btn'; }
-};
+}
 
 class Image extends Element{
   constructor(parent, src){
@@ -226,24 +230,25 @@ class Image extends Element{
   set src(val){ this.elem.src = val; }
 
   tag(){ return 'img'; }
-};
+}
 
-Element.Div = Div;
-Element.Left = Left;
-Element.Right = Right;
-Element.Text = Text;
-Element.Span = Span;
-Element.Input = Input;
-Element.InputText = InputText;
-Element.InputPass = InputPass;
-Element.InputTextarea = InputTextarea;
-Element.InputDropdown = InputDropdown;
-Element.Link = Link;
-Element.Heading = Heading;
-Element.Title = Title;
-Element.Rectangle = Rectangle;
-Element.Region = Region;
-Element.Button = Button;
-Element.Image = Image;
-
-module.exports = Element;
+module.exports = Object.assign(Element, {
+  Div,
+  Left,
+  Right,
+  Text,
+  Span,
+  Input,
+  InputText,
+  InputPass,
+  InputTextarea,
+  InputDropdown,
+  InputFile,
+  Link,
+  Heading,
+  Title,
+  Rectangle,
+  Region,
+  Button,
+  Image,
+});

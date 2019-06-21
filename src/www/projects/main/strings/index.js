@@ -2,7 +2,7 @@
 
 // Local strings
 
-const LANGUAGE = 'sr-cyrl-rs';
+const LANGUAGE = O.lst.lang;
 const dir = `./locales/${LANGUAGE}`;
 
 const LS = require(`${dir}/main`);
@@ -22,5 +22,7 @@ for(const text of texts){
 const langs = require('./languages');
 LS.langs = langs;
 LS.lang = LANGUAGE;
+
+O.glob.LS = LS;
 
 module.exports = LS;

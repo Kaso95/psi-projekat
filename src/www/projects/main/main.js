@@ -1,7 +1,7 @@
 'use strict';
 
 // Constants
-const LOADING_DISPLAY = 0;
+const LOADING_DISPLAY = 1;
 const LOADING_TRESHOLD = LOADING_DISPLAY ? 1e-4 : 1;
 
 /*
@@ -17,7 +17,7 @@ injectCss();
   The number of all XHR requests that are intended
   to be performed directly or indirectly.
 */
-const MODULES_NUM = 51;
+const MODULES_NUM = 140;
 O.module.remaining = MODULES_NUM;
 
 // Main and loading divs
@@ -26,10 +26,14 @@ const mainDiv = O.ce(O.body, 'div', 'top main');
 const modalDiv = O.ce(O.body, 'div', 'top modal-outer');
 injectLoading();
 
-// Load modules
-const DOM = require('./dom');
+// Initialize the local storage and the session storage wrappers
 const storage = require('./storage');
+O.lst = new storage.LocalStorage();
+O.sst = new storage.SessionStorage();
+
+// Load modules
 const backend = require('./backend');
+const DOM = require('./dom');
 
 let dom = null;
 
@@ -39,9 +43,6 @@ hasModules = 1;
 async function main(){
   // Ensure that CSS and all modules are loaded
   await O.while(() => !(hasCss && hasModules));
-
-  O.lst = new storage.LocalStorage();
-  O.sst = new storage.SessionStorage();
 
   // Create DOM instance
   dom = new DOM(mainDiv, modalDiv);
@@ -121,12 +122,16 @@ function injectLoading(){
     }
 
     if(O.module.remaining === 0 && 1 - k < LOADING_TRESHOLD)
-      return main()//.catch(error);
+      return main().catch(error);
 
     O.raf(render);
   }
 }
 
 function error(err){
-  O.error(err);
+  try{
+    O.glob.dom.err(err);
+  }catch{
+    O.error(err);
+  }
 }
